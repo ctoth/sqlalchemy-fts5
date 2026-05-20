@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy import Column, Integer, MetaData, String, Table, select, text
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session
 
 from sqlalchemy_fts5 import FTS5Match, FTS5Table, fts5_bm25, fts5_highlight, fts5_snippet
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Column, Integer, MetaData, String, Table, create_engine
+from sqlalchemy import Column, Integer, MetaData, String, Table
 from sqlalchemy.engine import Engine
 
 from sqlalchemy_fts5 import CreateFTS5Table, DropFTS5Table, FTS5Table

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+# pyright: reportUnusedFunction=false
+
 from typing import Any
 
 from sqlalchemy import Table
@@ -31,19 +33,19 @@ class FTS5Match(Generative, elements.BinaryExpression[Any]):
     __visit_name__ = "fts5_match"
     inherit_cache = True
 
-    _fts5_table: Table
+    fts5_table: Table
 
     def __init__(self, table: Table, against: Any):
-        self._fts5_table = table
+        self.fts5_table = table
         against = coercions.expect(roles.ExpressionElementRole, against)
         # Placeholder left side — the actual table name is rendered by @compiles
-        left = elements.literal_column(table.name)
+        left: elements.ColumnElement[Any] = elements.literal_column(table.name)
         super().__init__(left, against, operators.match_op)
 
 
 @compiles(FTS5Match, "sqlite")
 def _compile_fts5_match(element: FTS5Match, compiler: Any, **kw: Any) -> str:
     # Use the compiler's identifier preparer to properly quote the table name
-    table_name = compiler.preparer.format_table(element._fts5_table)
+    table_name = compiler.preparer.format_table(element.fts5_table)
     right = compiler.process(element.right, **kw)
     return f"{table_name} MATCH {right}"

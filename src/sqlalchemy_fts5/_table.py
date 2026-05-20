@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+# pyright: reportUnusedFunction=false
+
 from typing import Any
 
 from sqlalchemy import Column, Connection, Integer, MetaData, String, Table, event, text
 
 # Importing _ddl registers the @compiles handlers that intercept
 # CreateTable/DropTable for FTS5-marked tables.
-import sqlalchemy_fts5._ddl as _ddl  # noqa: F401
+import sqlalchemy_fts5._ddl as _ddl
+
+_DDL_HANDLERS = _ddl
 
 
 def FTS5Table(

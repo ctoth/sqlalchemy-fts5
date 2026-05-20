@@ -12,11 +12,13 @@ Two mechanisms for emitting FTS5 DDL:
 
 from __future__ import annotations
 
+# pyright: reportUnusedFunction=false
+
 from typing import Any
 
 from sqlalchemy import Table
 from sqlalchemy.ext.compiler import compiles
-from sqlalchemy.sql.ddl import CreateTable, DropTable, _CreateBase, _DropBase
+from sqlalchemy.sql.ddl import CreateTable, DropTable, ExecutableDDLElement
 
 
 def _is_fts5_table(table: Table) -> bool:
@@ -71,24 +73,30 @@ def _render_fts5_drop(table: Table, compiler: Any, if_exists: bool = False) -> s
 # ---------------------------------------------------------------------------
 
 
-class CreateFTS5Table(_CreateBase):
+class CreateFTS5Table(ExecutableDDLElement):
     """Emit ``CREATE VIRTUAL TABLE ... USING fts5(...)``."""
 
     __visit_name__ = "create_fts5_table"
     inherit_cache = False
+    element: Table
+    if_not_exists: bool
 
-    def __init__(self, table: Table, *, if_not_exists: bool = False, **kw: Any):
-        super().__init__(table, if_not_exists=if_not_exists, **kw)
+    def __init__(self, table: Table, *, if_not_exists: bool = False):
+        self.element = table
+        self.if_not_exists = if_not_exists
 
 
-class DropFTS5Table(_DropBase):
+class DropFTS5Table(ExecutableDDLElement):
     """Emit ``DROP TABLE`` for an FTS5 virtual table."""
 
     __visit_name__ = "drop_fts5_table"
     inherit_cache = False
+    element: Table
+    if_exists: bool
 
-    def __init__(self, table: Table, *, if_exists: bool = False, **kw: Any):
-        super().__init__(table, if_exists=if_exists, **kw)
+    def __init__(self, table: Table, *, if_exists: bool = False):
+        self.element = table
+        self.if_exists = if_exists
 
 
 @compiles(CreateFTS5Table, "sqlite")

@@ -68,11 +68,10 @@ class TestDDLProperties:
         """Generated DDL is always syntactically valid."""
         engine = create_engine("sqlite:///:memory:")
         meta = MetaData()
-        kwargs: dict = {"columns": cols}
-        if tok is not None:
-            kwargs["tokenize"] = tok
-
-        fts = FTS5Table(name, meta, **kwargs)
+        if tok is None:
+            fts = FTS5Table(name, meta, columns=cols)
+        else:
+            fts = FTS5Table(name, meta, columns=cols, tokenize=tok)
         sql = str(CreateFTS5Table(fts).compile(dialect=engine.dialect))
 
         assert sql.startswith("CREATE VIRTUAL TABLE")
@@ -95,7 +94,7 @@ class TestDDLProperties:
 
         with engine.connect() as conn:
             # Insert a row
-            values = {"rowid": 1}
+            values: dict[str, object] = {"rowid": 1}
             for col in cols:
                 values[col] = "test"
             conn.execute(fts.insert().values(**values))
@@ -143,7 +142,7 @@ class TestSearchProperties:
             conn.commit()
 
             # Pick a word that appears in at least one doc
-            all_words = set()
+            all_words: set[str] = set()
             for doc in docs:
                 all_words.update(w for w in doc.split() if w.strip())
 
@@ -182,7 +181,7 @@ class TestBM25Properties:
                 conn.execute(fts.insert().values(rowid=i + 1, body=doc))
             conn.commit()
 
-            all_words = set()
+            all_words: set[str] = set()
             for doc in docs:
                 all_words.update(w for w in doc.split() if w.strip())
             assume(len(all_words) > 0)
