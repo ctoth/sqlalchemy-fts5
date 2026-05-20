@@ -43,7 +43,7 @@ table_name = st.text(
     alphabet=string.ascii_lowercase + "_",
     min_size=2,
     max_size=30,
-).filter(lambda s: s[0] != "_" and s not in _SQLITE_RESERVED)
+).filter(lambda s: s[0] != "_" and s not in _SQLITE_RESERVED and s not in ("rowid", "rank"))
 
 # Strategy for FTS5 tokenizer specs
 tokenizer = st.sampled_from([
@@ -97,7 +97,7 @@ class TestDDLProperties:
             values: dict[str, object] = {"rowid": 1}
             for col in cols:
                 values[col] = "test"
-            conn.execute(fts.insert().values(**values))
+            conn.execute(fts.insert().values(values))
             conn.commit()
 
             # Query it back
