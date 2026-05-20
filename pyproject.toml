@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Christopher Toth", email = "q.alpha@gmail.com" }
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 license = "MIT"
 keywords = ["sqlalchemy", "sqlite", "fts5", "full-text-search"]
 classifiers = [
@@ -14,6 +14,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Database",
@@ -36,5 +37,5 @@ dev = [
 ]
 
 [tool.pyright]
-pythonVersion = "3.12"
+pythonVersion = "3.11"
 typeCheckingMode = "strict"
