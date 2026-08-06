@@ -11,39 +11,25 @@ from sqlalchemy import MetaData, create_engine, select
 from sqlalchemy_fts5 import CreateFTS5Table, FTS5Match, FTS5Table, fts5_bm25
 
 
-# Strategy for valid FTS5 column names
-column_name = st.text(
+plain_identifier = st.text(
     alphabet=string.ascii_lowercase + "_",
     min_size=1,
     max_size=20,
-).filter(lambda s: s[0] != "_" and s not in ("rowid", "rank"))
+).filter(lambda value: value[0] != "_")
+
+identifier = st.one_of(
+    plain_identifier,
+    st.sampled_from(
+        ["select", "two words", "hyphen-name", "2fast", 'quote"name', "author's"]
+    ),
+)
+
+# FTS5 reserves rowid and rank as hidden column names.
+column_name = identifier.filter(lambda value: value not in ("rowid", "rank"))
 
 column_names = st.lists(column_name, min_size=1, max_size=10, unique=True)
 
-# SQLite reserved words that can't be used as unquoted identifiers
-_SQLITE_RESERVED = frozenset(
-    "abort action add after all alter analyze and as asc attach autoincrement "
-    "before begin between by cascade case cast check collate column commit "
-    "conflict constraint create cross current current_date current_time "
-    "current_timestamp database default deferrable deferred delete desc detach "
-    "distinct do drop each else end escape except exclusive exists explain "
-    "fail filter first following for foreign from full generated glob group "
-    "having if ignore immediate in index indexed initially inner insert "
-    "instead intersect into is isnull join key last left like limit match "
-    "natural no not nothing notnull null nulls of offset on or order others "
-    "outer over partition plan pragma preceding primary query raise range "
-    "recursive references regexp reindex release rename replace restrict "
-    "returning right rollback row rows savepoint select set table temp "
-    "temporary then ties to transaction trigger unbounded union unique update "
-    "using vacuum values view virtual when where window with without".split()
-)
-
-# Strategy for valid table names (avoid SQL reserved words)
-table_name = st.text(
-    alphabet=string.ascii_lowercase + "_",
-    min_size=2,
-    max_size=30,
-).filter(lambda s: s[0] != "_" and s not in _SQLITE_RESERVED and s not in ("rowid", "rank"))
+table_name = identifier.filter(lambda value: value not in ("rowid", "rank"))
 
 # Strategy for FTS5 tokenizer specs
 tokenizer = st.sampled_from([

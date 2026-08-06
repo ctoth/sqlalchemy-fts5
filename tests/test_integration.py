@@ -270,6 +270,63 @@ class TestContentSync:
             assert "docs_fts_ad" not in trigger_names
             assert "docs_fts_au" not in trigger_names
 
+    def test_sync_with_identifiers_requiring_quoting(self, engine: Engine) -> None:
+        meta = MetaData()
+        docs = Table(
+            "content table",
+            meta,
+            Column("row id", Integer, primary_key=True),
+            Column("title text", String),
+            Column("select", String),
+        )
+        fts = FTS5Table(
+            "search-index",
+            meta,
+            columns=["title text", "select"],
+            content=docs,
+            content_rowid="row id",
+        )
+
+        meta.create_all(engine)
+
+        with engine.connect() as conn:
+            conn.execute(
+                docs.insert().values(
+                    {"row id": 1, "title text": "hello", "select": "world"}
+                )
+            )
+            conn.commit()
+            inserted = conn.execute(
+                select(fts.c.rowid).where(FTS5Match(fts, "hello"))
+            ).fetchall()
+            assert [row.rowid for row in inserted] == [1]
+
+            conn.execute(
+                docs.update()
+                .where(docs.c["row id"] == 1)
+                .values({"title text": "goodbye"})
+            )
+            conn.commit()
+            updated = conn.execute(
+                select(fts.c.rowid).where(FTS5Match(fts, "goodbye"))
+            ).fetchall()
+            assert [row.rowid for row in updated] == [1]
+
+            conn.execute(docs.delete().where(docs.c["row id"] == 1))
+            conn.commit()
+            deleted = conn.execute(
+                select(fts.c.rowid).where(FTS5Match(fts, "goodbye"))
+            ).fetchall()
+            assert deleted == []
+
+        meta.drop_all(engine)
+
+        with engine.connect() as conn:
+            triggers = conn.execute(
+                text("SELECT name FROM sqlite_master WHERE type='trigger'")
+            ).fetchall()
+            assert triggers == []
+
 
 # ---------------------------------------------------------------------------
 # ORM mapping
