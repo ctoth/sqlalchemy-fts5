@@ -108,44 +108,58 @@ def _create_sync_triggers(
     These triggers follow the pattern recommended by the SQLite FTS5
     documentation for external content tables.
     """
-    fts_name = fts_table.name
-    content_ref = options["content"]
-    content_name = content_ref.name if hasattr(content_ref, "name") else str(content_ref)
-    rowid_col = options["content_rowid"]
+    preparer = connection.dialect.identifier_preparer
+    fts_name = _ddl.format_table_identifier(preparer, fts_table)
+    fts_command_column = _ddl.quote_identifier(preparer, fts_table.name)
+    content_ref: Table | str = options["content"]
+    content_name = _ddl.format_table_identifier(preparer, content_ref)
+    rowid_col = _ddl.quote_identifier(preparer, options["content_rowid"])
+    rowid = _ddl.quote_identifier(preparer, "rowid")
 
-    col_list = ", ".join(columns)
-    new_col_list = ", ".join(f"new.{c}" for c in columns)
-    old_col_list = ", ".join(f"old.{c}" for c in columns)
+    quoted_columns = [_ddl.quote_identifier(preparer, column) for column in columns]
+    col_list = ", ".join(quoted_columns)
+    new_col_list = ", ".join(f"new.{column}" for column in quoted_columns)
+    old_col_list = ", ".join(f"old.{column}" for column in quoted_columns)
 
     # INSERT trigger
     connection.execute(text(
-        f"CREATE TRIGGER IF NOT EXISTS {fts_name}_ai AFTER INSERT ON {content_name} "
+        f"CREATE TRIGGER IF NOT EXISTS "
+        f"{_ddl.quote_identifier(preparer, f'{fts_table.name}_ai')} "
+        f"AFTER INSERT ON {content_name} "
         f"BEGIN"
-        f"  INSERT INTO {fts_name}(rowid, {col_list}) VALUES (new.{rowid_col}, {new_col_list});"
+        f"  INSERT INTO {fts_name}({rowid}, {col_list}) "
+        f"VALUES (new.{rowid_col}, {new_col_list});"
         f" END"
     ))
 
     # DELETE trigger: uses FTS5 'delete' command to remove from index
     connection.execute(text(
-        f"CREATE TRIGGER IF NOT EXISTS {fts_name}_ad AFTER DELETE ON {content_name} "
+        f"CREATE TRIGGER IF NOT EXISTS "
+        f"{_ddl.quote_identifier(preparer, f'{fts_table.name}_ad')} "
+        f"AFTER DELETE ON {content_name} "
         f"BEGIN"
-        f"  INSERT INTO {fts_name}({fts_name}, rowid, {col_list})"
+        f"  INSERT INTO {fts_name}({fts_command_column}, {rowid}, {col_list})"
         f" VALUES('delete', old.{rowid_col}, {old_col_list});"
         f" END"
     ))
 
     # UPDATE trigger: delete old entry, insert new
     connection.execute(text(
-        f"CREATE TRIGGER IF NOT EXISTS {fts_name}_au AFTER UPDATE ON {content_name} "
+        f"CREATE TRIGGER IF NOT EXISTS "
+        f"{_ddl.quote_identifier(preparer, f'{fts_table.name}_au')} "
+        f"AFTER UPDATE ON {content_name} "
         f"BEGIN"
-        f"  INSERT INTO {fts_name}({fts_name}, rowid, {col_list})"
+        f"  INSERT INTO {fts_name}({fts_command_column}, {rowid}, {col_list})"
         f" VALUES('delete', old.{rowid_col}, {old_col_list});"
-        f"  INSERT INTO {fts_name}(rowid, {col_list}) VALUES (new.{rowid_col}, {new_col_list});"
+        f"  INSERT INTO {fts_name}({rowid}, {col_list}) "
+        f"VALUES (new.{rowid_col}, {new_col_list});"
         f" END"
     ))
 
 
 def _drop_sync_triggers(connection: Connection, fts_name: str) -> None:
     """Drop the INSERT/DELETE/UPDATE sync triggers."""
+    preparer = connection.dialect.identifier_preparer
     for suffix in ("_ai", "_ad", "_au"):
-        connection.execute(text(f"DROP TRIGGER IF EXISTS {fts_name}{suffix}"))
+        trigger_name = _ddl.quote_identifier(preparer, f"{fts_name}{suffix}")
+        connection.execute(text(f"DROP TRIGGER IF EXISTS {trigger_name}"))

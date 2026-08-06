@@ -19,6 +19,22 @@ class TestCreateFTS5Table:
         sql = CreateFTS5Table(fts).compile(dialect=engine.dialect)
         assert str(sql) == "CREATE VIRTUAL TABLE t USING fts5(title)"
 
+    def test_quotes_table_and_column_identifiers(
+        self, engine: Engine, metadata: MetaData
+    ) -> None:
+        fts = FTS5Table(
+            "search-index",
+            metadata,
+            columns=["body text", "select", 'quote"column'],
+        )
+
+        sql = CreateFTS5Table(fts).compile(dialect=engine.dialect)
+
+        assert str(sql) == (
+            'CREATE VIRTUAL TABLE "search-index" USING '
+            'fts5("body text", "select", "quote""column")'
+        )
+
     def test_content_table_by_object(
         self, engine: Engine, metadata: MetaData, content_table: Table
     ) -> None:
@@ -40,6 +56,22 @@ class TestCreateFTS5Table:
         sql = str(CreateFTS5Table(fts).compile(dialect=engine.dialect))
         assert "content='docs'" in sql
 
+    def test_quotes_content_table_name_string(
+        self, engine: Engine, metadata: MetaData
+    ) -> None:
+        fts = FTS5Table(
+            "docs_fts",
+            metadata,
+            columns=["title"],
+            content="content table",
+            content_rowid="row id",
+        )
+
+        sql = str(CreateFTS5Table(fts).compile(dialect=engine.dialect))
+
+        assert "content='\"content table\"'" in sql
+        assert "content_rowid='\"row id\"'" in sql
+
     def test_tokenizer(self, engine: Engine, metadata: MetaData) -> None:
         fts = FTS5Table(
             "t", metadata, columns=["a"],
@@ -47,6 +79,30 @@ class TestCreateFTS5Table:
         )
         sql = str(CreateFTS5Table(fts).compile(dialect=engine.dialect))
         assert "tokenize='porter unicode61'" in sql
+
+    def test_quotes_option_identifiers_separately_from_string_literals(
+        self, engine: Engine, metadata: MetaData
+    ) -> None:
+        content = Table(
+            "content's table",
+            metadata,
+            Column('row"id', Integer, primary_key=True),
+            Column("body text", String),
+        )
+        fts = FTS5Table(
+            "search index",
+            metadata,
+            columns=["body text"],
+            content=content,
+            content_rowid='row"id',
+            tokenize="unicode61 tokenchars '-'",
+        )
+
+        sql = str(CreateFTS5Table(fts).compile(dialect=engine.dialect))
+
+        assert "content='\"content''s table\"'" in sql
+        assert "content_rowid='\"row\"\"id\"'" in sql
+        assert "tokenize='unicode61 tokenchars ''-'''" in sql
 
     def test_prefix(self, engine: Engine, metadata: MetaData) -> None:
         fts = FTS5Table("t", metadata, columns=["a"], prefix="2,3")
@@ -98,6 +154,15 @@ class TestDropFTS5Table:
         fts = FTS5Table("t", metadata, columns=["a"])
         sql = DropFTS5Table(fts, if_exists=True).compile(dialect=engine.dialect)
         assert "IF EXISTS" in str(sql)
+
+    def test_quotes_table_identifier(
+        self, engine: Engine, metadata: MetaData
+    ) -> None:
+        fts = FTS5Table("search-index", metadata, columns=["body"])
+
+        sql = DropFTS5Table(fts, if_exists=True).compile(dialect=engine.dialect)
+
+        assert str(sql) == 'DROP TABLE IF EXISTS "search-index"'
 
 
 class TestMetadataCreateAll:
