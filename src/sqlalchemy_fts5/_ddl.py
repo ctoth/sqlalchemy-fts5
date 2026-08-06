@@ -18,6 +18,7 @@ from typing import Any
 
 from sqlalchemy import Table
 from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.sql.compiler import IdentifierPreparer
 from sqlalchemy.sql.ddl import CreateTable, DropTable, ExecutableDDLElement
 
 
@@ -26,27 +27,51 @@ def _is_fts5_table(table: Table) -> bool:
     return bool(table.info.get("fts5_columns"))
 
 
+def quote_identifier(preparer: IdentifierPreparer, identifier: str) -> str:
+    """Render one SQLite identifier according to the active dialect."""
+    return preparer.quote(identifier)
+
+
+def format_table_identifier(
+    preparer: IdentifierPreparer, table: Table | str
+) -> str:
+    """Render a Table or public string table name as an identifier."""
+    if isinstance(table, Table):
+        return preparer.format_table(table)
+    return quote_identifier(preparer, table)
+
+
+def _render_fts5_string_literal(value: str) -> str:
+    """Render an FTS5 option value as a SQLite string literal."""
+    return "'" + value.replace("'", "''") + "'"
+
+
 def _render_fts5_create(table: Table, compiler: Any, if_not_exists: bool = False) -> str:
     """Render CREATE VIRTUAL TABLE ... USING fts5(...)."""
     info = table.info
     fts_columns: list[str] = info.get("fts5_columns", [])
     options: dict[str, Any] = info.get("fts5_options", {})
+    preparer: IdentifierPreparer = compiler.preparer
 
-    parts = list(fts_columns)
+    parts = [quote_identifier(preparer, column) for column in fts_columns]
 
     if "content" in options:
-        content_ref = options["content"]
-        content_name = content_ref.name if hasattr(content_ref, "name") else str(content_ref)
-        parts.append(f"content='{content_name}'")
+        content_ref: Table | str = options["content"]
+        content_name = format_table_identifier(preparer, content_ref)
+        parts.append(f"content={_render_fts5_string_literal(content_name)}")
 
     if "content_rowid" in options:
-        parts.append(f"content_rowid='{options['content_rowid']}'")
+        content_rowid: str = options["content_rowid"]
+        quoted_rowid = quote_identifier(preparer, content_rowid)
+        parts.append(f"content_rowid={_render_fts5_string_literal(quoted_rowid)}")
 
     if "tokenize" in options:
-        parts.append(f"tokenize='{options['tokenize']}'")
+        tokenize: str = options["tokenize"]
+        parts.append(f"tokenize={_render_fts5_string_literal(tokenize)}")
 
     if "prefix" in options:
-        parts.append(f"prefix='{options['prefix']}'")
+        prefix: str = options["prefix"]
+        parts.append(f"prefix={_render_fts5_string_literal(prefix)}")
 
     if "detail" in options:
         parts.append(f"detail={options['detail']}")
@@ -54,7 +79,7 @@ def _render_fts5_create(table: Table, compiler: Any, if_not_exists: bool = False
     if "columnsize" in options:
         parts.append(f"columnsize={options['columnsize']}")
 
-    table_name = compiler.preparer.format_table(table)
+    table_name = format_table_identifier(preparer, table)
     column_spec = ", ".join(parts)
     maybe_ine = "IF NOT EXISTS " if if_not_exists else ""
 
@@ -63,7 +88,8 @@ def _render_fts5_create(table: Table, compiler: Any, if_not_exists: bool = False
 
 def _render_fts5_drop(table: Table, compiler: Any, if_exists: bool = False) -> str:
     """Render DROP TABLE for an FTS5 virtual table."""
-    table_name = compiler.preparer.format_table(table)
+    preparer: IdentifierPreparer = compiler.preparer
+    table_name = format_table_identifier(preparer, table)
     maybe_ie = "IF EXISTS " if if_exists else ""
     return f"DROP TABLE {maybe_ie}{table_name}"
 

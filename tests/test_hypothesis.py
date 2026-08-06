@@ -63,9 +63,9 @@ class TestDDLProperties:
         assert sql.startswith("CREATE VIRTUAL TABLE")
         assert "USING fts5(" in sql
         assert sql.endswith(")")
-        # Every column name appears in the DDL
+        # Every column uses the active dialect's identifier representation.
         for col in cols:
-            assert col in sql
+            assert engine.dialect.identifier_preparer.quote(col) in sql
 
     @given(name=table_name, cols=column_names)
     @settings(max_examples=30)
