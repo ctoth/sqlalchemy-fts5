@@ -57,13 +57,13 @@ def _render_fts5_create(table: Table, compiler: Any, if_not_exists: bool = False
 
     if "content" in options:
         content_ref: Table | str = options["content"]
-        content_name = format_table_identifier(preparer, content_ref)
+        # FTS5 quotes these names itself when reading the content table.
+        content_name = content_ref.name if isinstance(content_ref, Table) else content_ref
         parts.append(f"content={_render_fts5_string_literal(content_name)}")
 
     if "content_rowid" in options:
         content_rowid: str = options["content_rowid"]
-        quoted_rowid = quote_identifier(preparer, content_rowid)
-        parts.append(f"content_rowid={_render_fts5_string_literal(quoted_rowid)}")
+        parts.append(f"content_rowid={_render_fts5_string_literal(content_rowid)}")
 
     if "tokenize" in options:
         tokenize: str = options["tokenize"]
