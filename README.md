@@ -133,7 +133,7 @@ Install the locked development environment with `uv sync --locked`, then run
 
 GitHub Actions runs the complete suite, including generated lifecycle tests and
 transactional state machines, on pull requests, pushes, merge queues, manual
-dispatches, and a weekly schedule. Tests cover Python 3.11–3.14 on Linux and Windows.
+dispatches, and a weekly schedule. Tests run on Linux with Python 3.11 and 3.14.
 CI uploads test reports and Hypothesis data for reproducing failures. Keep reduced
 regressions in test code; the local `.hypothesis` database is generated data.
 

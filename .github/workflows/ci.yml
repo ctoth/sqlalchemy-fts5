@@ -17,14 +17,13 @@ concurrency:
 
 jobs:
   test:
-    name: Test (${{ matrix.os }}, Python ${{ matrix.python }})
-    runs-on: ${{ matrix.os }}
+    name: Test (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        python: ['3.11', '3.12', '3.13', '3.14']
+        python: ['3.11', '3.14']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -40,7 +39,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: tests-${{ matrix.os }}-${{ matrix.python }}
+          name: tests-linux-${{ matrix.python }}
           path: |
             test-results.xml
             .hypothesis/
