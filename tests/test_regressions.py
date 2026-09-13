@@ -84,3 +84,14 @@ def test_external_content_requires_rowid(rowid: str | None) -> None:
     with pytest.raises(ValueError, match="content_rowid"):
         FTS5Table("idx", meta, columns=["body"], content="docs", content_rowid=rowid)
     assert not meta.tables
+
+
+def test_trigger_identifiers_are_not_bind_parameters(engine: Engine) -> None:
+    meta = MetaData()
+    docs = Table("content :param", meta, Column("id", Integer, primary_key=True), Column("body", String))
+    fts = FTS5Table("fts :param", meta, columns=["body"], content=docs, content_rowid="id")
+    meta.create_all(engine)
+    with engine.begin() as conn:
+        conn.execute(docs.insert(), {"id": 1, "body": "alpha"})
+        assert conn.execute(select(fts.c.body).where(FTS5Match(fts, "alpha"))).scalars().all() == ["alpha"]
+    meta.drop_all(engine)

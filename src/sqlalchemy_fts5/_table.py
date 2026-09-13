@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import Column, Connection, Integer, MetaData, String, Table, event, text
+from sqlalchemy import Column, Connection, Integer, MetaData, String, Table, event
 
 # Importing _ddl registers the @compiles handlers that intercept
 # CreateTable/DropTable for FTS5-marked tables.
@@ -134,7 +134,7 @@ def _create_sync_triggers(
     old_col_list = ", ".join(f"old.{column}" for column in quoted_columns)
 
     # INSERT trigger
-    connection.execute(text(
+    connection.exec_driver_sql(
         f"CREATE TRIGGER IF NOT EXISTS "
         f"{_ddl.quote_identifier(preparer, f'{fts_table.name}_ai')} "
         f"AFTER INSERT ON {content_name} "
@@ -142,10 +142,10 @@ def _create_sync_triggers(
         f"  INSERT INTO {fts_name}({rowid}, {col_list}) "
         f"VALUES (new.{rowid_col}, {new_col_list});"
         f" END"
-    ))
+    )
 
     # DELETE trigger: uses FTS5 'delete' command to remove from index
-    connection.execute(text(
+    connection.exec_driver_sql(
         f"CREATE TRIGGER IF NOT EXISTS "
         f"{_ddl.quote_identifier(preparer, f'{fts_table.name}_ad')} "
         f"AFTER DELETE ON {content_name} "
@@ -153,10 +153,10 @@ def _create_sync_triggers(
         f"  INSERT INTO {fts_name}({fts_command_column}, {rowid}, {col_list})"
         f" VALUES('delete', old.{rowid_col}, {old_col_list});"
         f" END"
-    ))
+    )
 
     # UPDATE trigger: delete old entry, insert new
-    connection.execute(text(
+    connection.exec_driver_sql(
         f"CREATE TRIGGER IF NOT EXISTS "
         f"{_ddl.quote_identifier(preparer, f'{fts_table.name}_au')} "
         f"AFTER UPDATE ON {content_name} "
@@ -166,7 +166,7 @@ def _create_sync_triggers(
         f"  INSERT INTO {fts_name}({rowid}, {col_list}) "
         f"VALUES (new.{rowid_col}, {new_col_list});"
         f" END"
-    ))
+    )
 
 
 def _drop_sync_triggers(connection: Connection, fts_name: str) -> None:
@@ -174,4 +174,4 @@ def _drop_sync_triggers(connection: Connection, fts_name: str) -> None:
     preparer = connection.dialect.identifier_preparer
     for suffix in ("_ai", "_ad", "_au"):
         trigger_name = _ddl.quote_identifier(preparer, f"{fts_name}{suffix}")
-        connection.execute(text(f"DROP TRIGGER IF EXISTS {trigger_name}"))
+        connection.exec_driver_sql(f"DROP TRIGGER IF EXISTS {trigger_name}")
