@@ -96,7 +96,7 @@ def FTS5Table(
     # If there's an external content table, create sync triggers after
     # the FTS5 table is created, and drop them before it's dropped.
     if content is not None and content != "" and content_rowid is not None:
-        @event.listens_for(table, "after_create")
+        @event.listens_for(table, "after_create", propagate=True)
         def _create_triggers(
             target: Table, connection: Connection, **kw: Any
         ) -> None:
@@ -108,7 +108,7 @@ def FTS5Table(
                 f"INSERT INTO {table_name}({command_column}) VALUES ('rebuild')"
             )
 
-        @event.listens_for(table, "before_drop")
+        @event.listens_for(table, "before_drop", propagate=True)
         def _drop_triggers(
             target: Table, connection: Connection, **kw: Any
         ) -> None:
