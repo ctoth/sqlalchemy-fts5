@@ -86,6 +86,13 @@ def FTS5Table(
         info={"fts5_columns": columns, "fts5_options": fts5_options},
     )
 
+    content_table = content if isinstance(content, Table) else None
+    if isinstance(content, str) and content:
+        content_key = f"{table.schema}.{content}" if table.schema else content
+        content_table = metadata.tables.get(content_key)
+    if content_table is not None:
+        table.add_is_dependent_on(content_table)
+
     # If there's an external content table, create sync triggers after
     # the FTS5 table is created, and drop them before it's dropped.
     if content is not None and content != "" and content_rowid is not None:
