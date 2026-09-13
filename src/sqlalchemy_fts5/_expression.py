@@ -38,8 +38,9 @@ class FTS5Match(Generative, elements.BinaryExpression[Any]):
     def __init__(self, table: Table, against: Any):
         self.fts5_table = table
         against = coercions.expect(roles.ExpressionElementRole, against)
-        # Placeholder left side — the actual table name is rendered by @compiles
-        left: elements.ColumnElement[Any] = elements.literal_column(table.name)
+        # Retain table ownership for FROM inference and statement cache keys.
+        # The compiler renders the FTS hidden column instead of this placeholder.
+        left: elements.ColumnElement[Any] = table.table_valued()
         super().__init__(left, against, operators.match_op)
 
 
