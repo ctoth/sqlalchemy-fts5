@@ -21,7 +21,7 @@ def fts5_bm25(table: Table) -> Function[Any]:
             .order_by(fts5_bm25(fts))
         )
     """
-    return func.bm25(expression.literal_column(table.name))
+    return func.bm25(expression.column(table.name))
 
 
 def fts5_highlight(
@@ -44,7 +44,7 @@ def fts5_highlight(
         close_tag: Markup inserted after each match.
     """
     return func.highlight(
-        expression.literal_column(table.name),
+        expression.column(table.name),
         column_index,
         open_tag,
         close_tag,
@@ -74,7 +74,7 @@ def fts5_snippet(
         max_tokens: Approximate maximum tokens in the returned snippet.
     """
     return func.snippet(
-        expression.literal_column(table.name),
+        expression.column(table.name),
         column_index,
         open_tag,
         close_tag,

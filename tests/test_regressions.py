@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import Column, Integer, MetaData, String, Table, select
 from sqlalchemy.engine import Engine
 
-from sqlalchemy_fts5 import FTS5Match, FTS5Table, fts5_highlight
+from sqlalchemy_fts5 import FTS5Match, FTS5Table, fts5_bm25, fts5_highlight, fts5_snippet
 
 
 @pytest.mark.parametrize("by_name", [False, True])
@@ -45,3 +45,15 @@ def test_index_existing_content_and_keep_it_synced(engine: Engine) -> None:
     meta.create_all(engine)
     with engine.connect() as conn:
         assert conn.execute(select(fts.c.rowid).where(FTS5Match(fts, "world"))).scalars().all() == [1]
+
+
+@pytest.mark.parametrize("name", ["search index", "select", 'quote"name', "hyphen-name"])
+def test_auxiliary_functions_quote_names(engine: Engine, name: str) -> None:
+    meta = MetaData()
+    fts = FTS5Table(name, meta, columns=["body"])
+    meta.create_all(engine)
+    with engine.begin() as conn:
+        conn.execute(fts.insert(), {"body": "hello world"})
+        assert conn.execute(select(fts5_bm25(fts)).select_from(fts).where(FTS5Match(fts, "hello"))).scalar_one() < 0
+        for expression in [fts5_highlight(fts, 0), fts5_snippet(fts, 0)]:
+            assert conn.execute(select(expression).select_from(fts).where(FTS5Match(fts, "hello"))).scalar_one() == "<b>hello</b> world"
