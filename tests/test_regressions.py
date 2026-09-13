@@ -69,3 +69,18 @@ def test_schema_qualified_match(engine: Engine, schema: str) -> None:
         meta.create_all(conn)
         conn.execute(fts.insert(), {"rowid": 1, "body": "hello"})
         assert conn.execute(select(fts.c.rowid).where(FTS5Match(fts, "hello"))).scalars().all() == [1]
+
+
+def test_empty_columns_rejected_before_metadata_mutation() -> None:
+    meta = MetaData()
+    with pytest.raises(ValueError, match="at least one"):
+        FTS5Table("idx", meta, columns=[])
+    assert not meta.tables
+
+
+@pytest.mark.parametrize("rowid", [None, ""])
+def test_external_content_requires_rowid(rowid: str | None) -> None:
+    meta = MetaData()
+    with pytest.raises(ValueError, match="content_rowid"):
+        FTS5Table("idx", meta, columns=["body"], content="docs", content_rowid=rowid)
+    assert not meta.tables

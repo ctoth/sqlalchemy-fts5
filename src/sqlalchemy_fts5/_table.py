@@ -46,7 +46,7 @@ def FTS5Table(
             When set, the FTS5 table stores no content itself and reads from
             the content table on demand.
         content_rowid: Column in the content table that maps to ``rowid``.
-            Required when *content* is set.
+            Required for non-empty external *content*.
         tokenize: FTS5 tokenizer specification (e.g. ``"porter unicode61"``).
         prefix: Prefix index sizes (e.g. ``"2,3"``).
         detail: FTS5 detail mode: ``"full"``, ``"column"``, or ``"none"``.
@@ -56,6 +56,11 @@ def FTS5Table(
         A Table with FTS5 DDL, a ``rowid`` primary key column, and
         String columns for each indexed column.
     """
+    if not columns:
+        raise ValueError("FTS5 requires at least one indexed column")
+    if content is not None and content != "" and not content_rowid:
+        raise ValueError("content_rowid is required for external content")
+
     sa_columns: list[Column[Any]] = [Column("rowid", Integer, primary_key=True)]
     sa_columns.extend(Column(col, String) for col in columns)
 
