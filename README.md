@@ -125,6 +125,18 @@ FTS5Match(fts, "NEAR(python sqlite, 5)")   # proximity
 
 Works with `metadata.create_all()`, `metadata.drop_all()`, and ORM `Mapped[]` types.
 
+## Development and CI
+
+Install the locked development environment with `uv sync --locked`, then run
+`uv run pytest --hypothesis-profile=ci --hypothesis-show-statistics` and
+`uv run pyright`. Build distributions with `uv build`.
+
+GitHub Actions runs the complete suite, including generated lifecycle tests and
+transactional state machines, on pull requests, pushes, merge queues, manual
+dispatches, and a weekly schedule. Tests cover Python 3.11–3.14 on Linux and Windows.
+CI uploads test reports and Hypothesis data for reproducing failures. Keep reduced
+regressions in test code; the local `.hypothesis` database is generated data.
+
 ## License
 
 MIT
