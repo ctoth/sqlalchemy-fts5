@@ -2,28 +2,62 @@ name: CI
 
 on:
   push:
-    branches: [master]
   pull_request:
+  merge_group:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 7 * * 1'
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
-    name: Python ${{ matrix.python-version }}
+    name: Test (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
-
+        python: ['3.11', '3.14']
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v9.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          python-version: ${{ matrix.python-version }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          python-version: ${{ matrix.python }}
           enable-cache: true
-      - run: uv sync --locked --all-groups
-      - run: uv run pytest
-      - run: uv run pyright
+      - run: uv sync --locked
+      - name: Run tests and Hypothesis state machines
+        run: uv run --no-sync pytest --hypothesis-profile=ci --hypothesis-show-statistics --junitxml=test-results.xml
+      - name: Preserve test results and failure examples
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tests-linux-${{ matrix.python }}
+          path: |
+            test-results.xml
+            .hypothesis/
+          include-hidden-files: true
+          if-no-files-found: ignore
+
+  quality:
+    name: Types and package build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          python-version: '3.11'
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run --no-sync pyright
       - run: uv build

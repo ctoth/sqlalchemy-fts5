@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import Column, Connection, Integer, MetaData, String, Table, event, text
+from sqlalchemy import Column, Connection, Integer, MetaData, String, Table, event
 
 # Importing _ddl registers the @compiles handlers that intercept
 # CreateTable/DropTable for FTS5-marked tables.
@@ -35,7 +35,8 @@ def FTS5Table(
 
     If *content* is provided (external content table), DDL triggers are
     automatically created to keep the FTS index in sync with the content table
-    on INSERT, DELETE, and UPDATE.
+    on INSERT, DELETE, and UPDATE. Existing content is indexed when the FTS
+    table is first created.
 
     Args:
         name: Table name.
@@ -45,7 +46,7 @@ def FTS5Table(
             When set, the FTS5 table stores no content itself and reads from
             the content table on demand.
         content_rowid: Column in the content table that maps to ``rowid``.
-            Required when *content* is set.
+            Required for non-empty external *content*.
         tokenize: FTS5 tokenizer specification (e.g. ``"porter unicode61"``).
         prefix: Prefix index sizes (e.g. ``"2,3"``).
         detail: FTS5 detail mode: ``"full"``, ``"column"``, or ``"none"``.
@@ -55,6 +56,12 @@ def FTS5Table(
         A Table with FTS5 DDL, a ``rowid`` primary key column, and
         String columns for each indexed column.
     """
+    if not columns:
+        raise ValueError("FTS5 requires at least one indexed column")
+    if content is not None and content != "" and not content_rowid:
+        raise ValueError("content_rowid is required for external content")
+
+    columns = list(columns)
     sa_columns: list[Column[Any]] = [Column("rowid", Integer, primary_key=True)]
     sa_columns.extend(Column(col, String) for col in columns)
 
@@ -79,20 +86,33 @@ def FTS5Table(
         info={"fts5_columns": columns, "fts5_options": fts5_options},
     )
 
+    content_table = content if isinstance(content, Table) else None
+    if isinstance(content, str) and content:
+        content_key = f"{table.schema}.{content}" if table.schema else content
+        content_table = metadata.tables.get(content_key)
+    if content_table is not None:
+        table.add_is_dependent_on(content_table)
+
     # If there's an external content table, create sync triggers after
     # the FTS5 table is created, and drop them before it's dropped.
-    if content is not None and content_rowid is not None:
-        @event.listens_for(table, "after_create")
+    if content is not None and content != "" and content_rowid is not None:
+        @event.listens_for(table, "after_create", propagate=True)
         def _create_triggers(
             target: Table, connection: Connection, **kw: Any
         ) -> None:
             _create_sync_triggers(connection, target, fts5_options, columns)
+            preparer = connection.dialect.identifier_preparer
+            table_name = _ddl.format_table_identifier(preparer, target)
+            command_column = _ddl.quote_identifier(preparer, target.name)
+            connection.exec_driver_sql(
+                f"INSERT INTO {table_name}({command_column}) VALUES ('rebuild')"
+            )
 
-        @event.listens_for(table, "before_drop")
+        @event.listens_for(table, "before_drop", propagate=True)
         def _drop_triggers(
             target: Table, connection: Connection, **kw: Any
         ) -> None:
-            _drop_sync_triggers(connection, name)
+            _drop_sync_triggers(connection, target)
 
     return table
 
@@ -109,7 +129,8 @@ def _create_sync_triggers(
     documentation for external content tables.
     """
     preparer = connection.dialect.identifier_preparer
-    fts_name = _ddl.format_table_identifier(preparer, fts_table)
+    # SQLite forbids schema-qualified INSERT targets inside trigger bodies.
+    fts_name = _ddl.quote_identifier(preparer, fts_table.name)
     fts_command_column = _ddl.quote_identifier(preparer, fts_table.name)
     content_ref: Table | str = options["content"]
     content_name = _ddl.format_table_identifier(preparer, content_ref)
@@ -121,32 +142,38 @@ def _create_sync_triggers(
     new_col_list = ", ".join(f"new.{column}" for column in quoted_columns)
     old_col_list = ", ".join(f"old.{column}" for column in quoted_columns)
 
+    def trigger_name(suffix: str) -> str:
+        identifier = _ddl.quote_identifier(preparer, f"{fts_table.name}{suffix}")
+        if fts_table.schema is not None:
+            identifier = f"{preparer.quote_schema(fts_table.schema)}.{identifier}"
+        return identifier
+
     # INSERT trigger
-    connection.execute(text(
+    connection.exec_driver_sql(
         f"CREATE TRIGGER IF NOT EXISTS "
-        f"{_ddl.quote_identifier(preparer, f'{fts_table.name}_ai')} "
+        f"{trigger_name('_ai')} "
         f"AFTER INSERT ON {content_name} "
         f"BEGIN"
         f"  INSERT INTO {fts_name}({rowid}, {col_list}) "
         f"VALUES (new.{rowid_col}, {new_col_list});"
         f" END"
-    ))
+    )
 
     # DELETE trigger: uses FTS5 'delete' command to remove from index
-    connection.execute(text(
+    connection.exec_driver_sql(
         f"CREATE TRIGGER IF NOT EXISTS "
-        f"{_ddl.quote_identifier(preparer, f'{fts_table.name}_ad')} "
+        f"{trigger_name('_ad')} "
         f"AFTER DELETE ON {content_name} "
         f"BEGIN"
         f"  INSERT INTO {fts_name}({fts_command_column}, {rowid}, {col_list})"
         f" VALUES('delete', old.{rowid_col}, {old_col_list});"
         f" END"
-    ))
+    )
 
     # UPDATE trigger: delete old entry, insert new
-    connection.execute(text(
+    connection.exec_driver_sql(
         f"CREATE TRIGGER IF NOT EXISTS "
-        f"{_ddl.quote_identifier(preparer, f'{fts_table.name}_au')} "
+        f"{trigger_name('_au')} "
         f"AFTER UPDATE ON {content_name} "
         f"BEGIN"
         f"  INSERT INTO {fts_name}({fts_command_column}, {rowid}, {col_list})"
@@ -154,12 +181,14 @@ def _create_sync_triggers(
         f"  INSERT INTO {fts_name}({rowid}, {col_list}) "
         f"VALUES (new.{rowid_col}, {new_col_list});"
         f" END"
-    ))
+    )
 
 
-def _drop_sync_triggers(connection: Connection, fts_name: str) -> None:
+def _drop_sync_triggers(connection: Connection, fts_table: Table) -> None:
     """Drop the INSERT/DELETE/UPDATE sync triggers."""
     preparer = connection.dialect.identifier_preparer
     for suffix in ("_ai", "_ad", "_au"):
-        trigger_name = _ddl.quote_identifier(preparer, f"{fts_name}{suffix}")
-        connection.execute(text(f"DROP TRIGGER IF EXISTS {trigger_name}"))
+        trigger_name = _ddl.quote_identifier(preparer, f"{fts_table.name}{suffix}")
+        if fts_table.schema is not None:
+            trigger_name = f"{preparer.quote_schema(fts_table.schema)}.{trigger_name}"
+        connection.exec_driver_sql(f"DROP TRIGGER IF EXISTS {trigger_name}")

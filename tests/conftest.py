@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import pytest
+from hypothesis import settings
 from sqlalchemy import Column, Integer, MetaData, String, Table, create_engine
 from sqlalchemy.engine import Engine
+
+
+settings.register_profile("ci", deadline=None, print_blob=True)
 
 
 @pytest.fixture

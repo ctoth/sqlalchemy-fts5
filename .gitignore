@@ -8,3 +8,8 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Generated test data; regression examples belong in tracked test code.
+.hypothesis/
+.pytest_cache/
+test-results.xml

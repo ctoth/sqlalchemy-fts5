@@ -38,14 +38,16 @@ class FTS5Match(Generative, elements.BinaryExpression[Any]):
     def __init__(self, table: Table, against: Any):
         self.fts5_table = table
         against = coercions.expect(roles.ExpressionElementRole, against)
-        # Placeholder left side — the actual table name is rendered by @compiles
-        left: elements.ColumnElement[Any] = elements.literal_column(table.name)
+        # Retain table ownership for FROM inference and statement cache keys.
+        # The compiler renders the FTS hidden column instead of this placeholder.
+        left: elements.ColumnElement[Any] = table.table_valued()
         super().__init__(left, against, operators.match_op)
 
 
 @compiles(FTS5Match, "sqlite")
 def _compile_fts5_match(element: FTS5Match, compiler: Any, **kw: Any) -> str:
     # Use the compiler's identifier preparer to properly quote the table name
-    table_name = compiler.preparer.format_table(element.fts5_table)
+    # MATCH uses the hidden column named after the table, without its schema.
+    table_name = compiler.preparer.quote(element.fts5_table.name)
     right = compiler.process(element.right, **kw)
     return f"{table_name} MATCH {right}"

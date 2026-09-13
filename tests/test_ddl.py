@@ -69,8 +69,8 @@ class TestCreateFTS5Table:
 
         sql = str(CreateFTS5Table(fts).compile(dialect=engine.dialect))
 
-        assert "content='\"content table\"'" in sql
-        assert "content_rowid='\"row id\"'" in sql
+        assert "content='content table'" in sql
+        assert "content_rowid='row id'" in sql
 
     def test_tokenizer(self, engine: Engine, metadata: MetaData) -> None:
         fts = FTS5Table(
@@ -100,8 +100,8 @@ class TestCreateFTS5Table:
 
         sql = str(CreateFTS5Table(fts).compile(dialect=engine.dialect))
 
-        assert "content='\"content''s table\"'" in sql
-        assert "content_rowid='\"row\"\"id\"'" in sql
+        assert "content='content''s table'" in sql
+        assert "content_rowid='row\"id'" in sql
         assert "tokenize='unicode61 tokenchars ''-'''" in sql
 
     def test_prefix(self, engine: Engine, metadata: MetaData) -> None:

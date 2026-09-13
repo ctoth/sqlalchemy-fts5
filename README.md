@@ -42,7 +42,7 @@ with engine.connect() as conn:
 
 ## External content tables
 
-FTS5 can index a regular table without duplicating the data. Sync triggers are created automatically.
+FTS5 can index a regular table without duplicating the data. Sync triggers are created automatically, and existing rows are indexed when the FTS5 table is first created.
 
 ```python
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
@@ -124,6 +124,18 @@ FTS5Match(fts, "NEAR(python sqlite, 5)")   # proximity
 `FTS5Table()` returns a normal SQLAlchemy `Table` with metadata in `table.info` that marks it as FTS5. When SQLAlchemy compiles `CreateTable` for a table with this marker, a `@compiles` handler intercepts it and emits `CREATE VIRTUAL TABLE ... USING fts5(...)` instead. Same mechanism for `DropTable`. No monkey-patching, no private APIs — just the `@compiles` extension point that SQLAlchemy provides for exactly this purpose.
 
 Works with `metadata.create_all()`, `metadata.drop_all()`, and ORM `Mapped[]` types.
+
+## Development and CI
+
+Install the locked development environment with `uv sync --locked`, then run
+`uv run pytest --hypothesis-profile=ci --hypothesis-show-statistics` and
+`uv run pyright`. Build distributions with `uv build`.
+
+GitHub Actions runs the complete suite, including generated lifecycle tests and
+transactional state machines, on pull requests, pushes, merge queues, manual
+dispatches, and a weekly schedule. Tests run on Linux with Python 3.11 and 3.14.
+CI uploads test reports and Hypothesis data for reproducing failures. Keep reduced
+regressions in test code; the local `.hypothesis` database is generated data.
 
 ## License
 
