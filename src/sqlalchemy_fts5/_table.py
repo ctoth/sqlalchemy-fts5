@@ -35,7 +35,8 @@ def FTS5Table(
 
     If *content* is provided (external content table), DDL triggers are
     automatically created to keep the FTS index in sync with the content table
-    on INSERT, DELETE, and UPDATE.
+    on INSERT, DELETE, and UPDATE. Existing content is indexed when the FTS
+    table is first created.
 
     Args:
         name: Table name.
@@ -87,6 +88,12 @@ def FTS5Table(
             target: Table, connection: Connection, **kw: Any
         ) -> None:
             _create_sync_triggers(connection, target, fts5_options, columns)
+            preparer = connection.dialect.identifier_preparer
+            table_name = _ddl.format_table_identifier(preparer, target)
+            command_column = _ddl.quote_identifier(preparer, target.name)
+            connection.exec_driver_sql(
+                f"INSERT INTO {table_name}({command_column}) VALUES ('rebuild')"
+            )
 
         @event.listens_for(table, "before_drop")
         def _drop_triggers(

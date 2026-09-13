@@ -42,7 +42,7 @@ with engine.connect() as conn:
 
 ## External content tables
 
-FTS5 can index a regular table without duplicating the data. Sync triggers are created automatically.
+FTS5 can index a regular table without duplicating the data. Sync triggers are created automatically, and existing rows are indexed when the FTS5 table is first created.
 
 ```python
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
