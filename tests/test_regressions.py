@@ -57,3 +57,15 @@ def test_auxiliary_functions_quote_names(engine: Engine, name: str) -> None:
         assert conn.execute(select(fts5_bm25(fts)).select_from(fts).where(FTS5Match(fts, "hello"))).scalar_one() < 0
         for expression in [fts5_highlight(fts, 0), fts5_snippet(fts, 0)]:
             assert conn.execute(select(expression).select_from(fts).where(FTS5Match(fts, "hello"))).scalar_one() == "<b>hello</b> world"
+
+
+@pytest.mark.parametrize("schema", ["main", "attached"])
+def test_schema_qualified_match(engine: Engine, schema: str) -> None:
+    meta = MetaData(schema=schema)
+    fts = FTS5Table("search index", meta, columns=["body"])
+    with engine.begin() as conn:
+        if schema == "attached":
+            conn.exec_driver_sql("ATTACH DATABASE ':memory:' AS attached")
+        meta.create_all(conn)
+        conn.execute(fts.insert(), {"rowid": 1, "body": "hello"})
+        assert conn.execute(select(fts.c.rowid).where(FTS5Match(fts, "hello"))).scalars().all() == [1]

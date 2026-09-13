@@ -46,6 +46,7 @@ class FTS5Match(Generative, elements.BinaryExpression[Any]):
 @compiles(FTS5Match, "sqlite")
 def _compile_fts5_match(element: FTS5Match, compiler: Any, **kw: Any) -> str:
     # Use the compiler's identifier preparer to properly quote the table name
-    table_name = compiler.preparer.format_table(element.fts5_table)
+    # MATCH uses the hidden column named after the table, without its schema.
+    table_name = compiler.preparer.quote(element.fts5_table.name)
     right = compiler.process(element.right, **kw)
     return f"{table_name} MATCH {right}"
